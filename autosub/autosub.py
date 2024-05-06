@@ -7,9 +7,10 @@ from typing import Dict, List
 
 import torch
 import whisper
+from tqdm.auto import tqdm
 
 from .utils import (collect_video_paths, embed_subtitle, extract_audio,
-                    get_output_dir, transcribe)
+                    get_output_dir, is_video, transcribe)
 
 
 def autosub(inputs: List[str],
@@ -20,6 +21,7 @@ def autosub(inputs: List[str],
             language: str,
             simplified: bool,
             initial_prompt: str,
+            overwrite: bool,
             verbose: bool,
             embed: bool):
     """Transcribe videos and embed subtitles into them.
@@ -33,6 +35,7 @@ def autosub(inputs: List[str],
         language (str):         What is the origin language of the video? If unset, it is detected automatically.
         simplified (bool):      Whether to output the simplified Chinese.
         initial_prompt (str):   Initial prompt for the transcription.
+        overwrite (bool):       Whether to overwrite the existing files.
         verbose (bool):         Whether to print out the progress and debug messages.
         embed (bool):           Whether to embed the subtitles into the video.
     """
@@ -60,7 +63,7 @@ def autosub(inputs: List[str],
     model_args['initial_prompt'] = initial_prompt
 
     if language in ('zh', 'Chinese') and simplified:
-        model_args['initial_prompt'] += '以下是普通话句子'
+        model_args['initial_prompt'] += ';以下是普通话句子;'
 
     model = whisper.load_model(
         model_name, device=torch.device('cuda' if gpu else 'cpu'))
@@ -77,16 +80,29 @@ def autosub(inputs: List[str],
                 for video_path in collect_video_paths(input_path)
             })
         else:
+            if not is_video(input_path):
+                logging.warning('Skipping non-video file %s', input_path.as_posix())
+                continue
             input_paths_to_srt_paths[input_path] = Path(get_output_dir(
                 input_path, output_dir)) / input_path.with_suffix('.srt').name
 
     logging.info('Transcribing videos...')
     for video_path, srt_path in input_paths_to_srt_paths.items():
+        if not overwrite and srt_path.exists():
+            logging.info('Skipping video %s as the output already exists.',
+                         video_path.as_posix())
+            continue
+        logging.info('Extracting audio from video %s...', video_path.as_posix())
         audio = extract_audio(video_path)
+        logging.info('Transcribing video %s...', video_path.as_posix())
         transcribe(audio, srt_path, transcribe_func)
 
     if embed:
         logging.info('Embedding subtitles into the video...')
-        for video_path, srt_path in input_paths_to_srt_paths.items():
-            output_path = srt_path.with_suffix(video_path.suffix)
+        for video_path, srt_path in tqdm(input_paths_to_srt_paths.items(), desc='Embedding subtitles'):
+            output_path = srt_path.with_stem(srt_path.stem + '_transcript').with_suffix(video_path.suffix)
+            if not overwrite and output_path.exists():
+                logging.info('Skipping video %s as the output already exists.',
+                             video_path.as_posix())
+                continue
             embed_subtitle(video_path, srt_path, output_path)
