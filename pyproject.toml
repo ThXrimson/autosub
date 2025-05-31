@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "autosub"
+authors = [
+    { name = "Tian Haoxiang", email = "tian_haoxiang@163.com" }
+]
+version = "0.2.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.2.1",
+    "ffmpeg-python>=0.2.0",
+    "openai-whisper>=20240930",
+    "torch>=2.6.0",
+]
+
+[project.scripts]
+autosub = "autosub.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autosub/"]
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
