@@ -21,9 +21,6 @@ dependencies = [
 [project.scripts]
 autosub = "autosub.main:main"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/autosub/"]
-
 [tool.uv.sources]
 torch = { index = "pytorch" }
 
