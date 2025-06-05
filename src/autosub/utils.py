@@ -20,9 +20,13 @@ def is_audio(path: StrOrPath) -> bool:
     return type is not None and type.startswith("audio/")
 
 
-def collect_video_paths(dir: StrOrPath) -> List[Path]:
+def collect_video_paths(dir: StrOrPath, recursive: bool) -> List[Path]:
     """This function will not recursively search for videos."""
-    return [path for path in Path(dir).iterdir() if is_video(path)]
+    return [
+        path
+        for path in (Path(dir).rglob("*") if recursive else Path(dir).glob("*"))
+        if is_video(path)
+    ]
 
 
 def extract_audio(path: StrOrPath) -> NDArray:
@@ -31,8 +35,8 @@ def extract_audio(path: StrOrPath) -> NDArray:
             audio = whisper.load_audio(Path(path).as_posix())
         else:
             output_path = Path(dir) / Path(path).name
-            ffmpeg.input(str(path)).output(
-                output_path.as_posix(), acodec="pcm_s16le", ac=1, ar="16k"
+            ffmpeg.input(str(path), vn=None).output(
+                output_path.as_posix(), acodec="copy"
             ).run(quiet=True, overwrite_output=True)
             audio = whisper.load_audio(output_path.as_posix())
     return audio

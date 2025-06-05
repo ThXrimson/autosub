@@ -1,6 +1,5 @@
 import logging
 import os
-import warnings
 from functools import partial
 from pathlib import Path
 from typing import Dict
@@ -22,10 +21,11 @@ from .utils import (
 
 def autosub(
     inputs: tuple[str],
+    recursive: bool,
     output_dir: str,
     model_name: str,
     whisper_root: str,
-    gpu: bool,
+    cpu: bool,
     task: str,
     language: str,
     initial_prompt: str,
@@ -40,7 +40,7 @@ def autosub(
         output_dir (str):       Directory to save the outputs.
         model_name (str):       Names of the Whisper model to use.
         download_root (str):    Directory to download Whisper models. Defaults to ~/.cache/whisper.
-        gpu (bool):             Whether to use the GPU for inference.
+        cpu (bool):             Whether to use the CPU for inference.
         task (str):             Whether to perform X->X speech recognition (`transcribe`) or X->English translation (`translate`).
         language (str):         What is the origin language of the video? If unset, it is detected automatically.
         simplified (bool):      Whether to output the simplified Chinese.
@@ -71,7 +71,7 @@ def autosub(
 
     model = whisper.load_model(
         model_name,
-        device=torch.device("cuda" if gpu else "cpu"),
+        device=torch.device("cpu" if cpu else "cuda"),
         download_root=whisper_root,
     )
     transcribe_func = partial(model.transcribe, **model_args)
@@ -85,8 +85,7 @@ def autosub(
                 {
                     video_path: get_output_dir(video_path, output_dir)
                     / video_path.with_suffix(".srt").name
-                    for video_path in collect_video_paths(input_path)
-                    if is_video(input_path) or is_audio(input_path)
+                    for video_path in collect_video_paths(input_path, recursive)
                 }
             )
         else:

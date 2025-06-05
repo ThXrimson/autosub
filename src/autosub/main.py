@@ -17,6 +17,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     type=click.Path(exists=True, dir_okay=True, file_okay=True),
 )
 @click.option(
+    "-r",
+    "--recursive",
+    default=False,
+    is_flag=True,
+    help="Recursively search for video and audio files in directories.",
+)
+@click.option(
     "-o",
     "--output-dir",
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
@@ -41,13 +48,13 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
     "--whisper-root",
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
     default=None,
-    help="Directory to download Whisper models. Defaults to environment variable AUTOSUB_WHISPER_ROOT or ~/.cache/whisper.",
+    help="Directory to download Whisper models. Defaults to environment variable AUTOSUB_WHISPER_ROOT or AppData.",
 )
 @click.option(
-    "--gpu",
+    "--cpu",
     is_flag=True,
-    default=True,
-    help="Use GPU for transcription if available.",
+    default=False,
+    help="Use CPU for transcription if available.",
 )
 @click.option(
     "--task",
@@ -93,11 +100,12 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 )
 def main(
     inputs,
+    recursive,
     output_dir,
     list_models,
     model,
     whisper_root,
-    gpu,
+    cpu,
     task,
     language,
     initial_prompt,
@@ -114,7 +122,7 @@ def main(
         format="%(asctime)s - [%(levelname)s] - %(message)s",
         datefmt="%H:%M:%S",
     )
-    logging.disable(logging.NOTSET if verbose else logging.INFO)
+    logging.disable(logging.NOTSET if verbose else logging.DEBUG)
     if list_models:
         click.echo("Available Whisper models:")
         for model in whisper.available_models():
@@ -122,24 +130,23 @@ def main(
         return
     if not inputs:
         raise click.UsageError("No input files or directories specified.")
-    if not torch.cuda.is_available() and gpu:
+    if torch.cuda.is_available() and cpu:
         logging.warning(
-            "GPU is not available. Using CPU for transcription. "
-            "This may be slow for large files."
+            "CUDA is available, but --cpu flag is set. Using CPU for transcription."
         )
-        gpu = False
     if whisper_root is None:
         whisper_root = (
-            click.get_app_dir("autosub", roaming=True)
+            click.get_app_dir("autosub")
             if "AUTOSUB_WHISPER_ROOT" not in os.environ
             else os.environ["AUTOSUB_WHISPER_ROOT"]
         )
     autosub(
         inputs,
+        recursive,
         output_dir,
         model,
         whisper_root,
-        gpu,
+        cpu,
         task,
         language,
         initial_prompt,
